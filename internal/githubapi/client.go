@@ -46,7 +46,7 @@ type apiUser struct {
 	ID                int64  `json:"id"`
 	Login             string `json:"login"`
 	PublicRepos       int    `json:"public_repos"`
-	OwnedPrivateRepos int    `json:"owned_private_repos"`
+	OwnedPrivateRepos *int   `json:"owned_private_repos"`
 }
 
 type apiRepository struct {
@@ -67,12 +67,16 @@ func (c *Client) AuthenticatedUser(ctx context.Context) (model.User, error) {
 	if err := c.getJSON(ctx, "/user", nil, &user); err != nil {
 		return model.User{}, err
 	}
-	return model.User{
-		ID:                user.ID,
-		Login:             user.Login,
-		PublicRepos:       user.PublicRepos,
-		OwnedPrivateRepos: user.OwnedPrivateRepos,
-	}, nil
+	result := model.User{
+		ID:          user.ID,
+		Login:       user.Login,
+		PublicRepos: user.PublicRepos,
+	}
+	if user.OwnedPrivateRepos != nil {
+		result.OwnedPrivateRepos = *user.OwnedPrivateRepos
+		result.OwnedPrivateReposReported = true
+	}
+	return result, nil
 }
 
 func (c *Client) OwnedRepositories(ctx context.Context) ([]model.Repository, error) {

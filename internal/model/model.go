@@ -31,10 +31,11 @@ func (r Repository) Status() string {
 }
 
 type User struct {
-	ID                int64
-	Login             string
-	PublicRepos       int
-	OwnedPrivateRepos int
+	ID                        int64
+	Login                     string
+	PublicRepos               int
+	OwnedPrivateRepos         int
+	OwnedPrivateReposReported bool
 }
 
 type Evidence struct {

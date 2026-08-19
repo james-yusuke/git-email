@@ -44,7 +44,7 @@ read -s GITHUB_TOKEN
 export GITHUB_TOKEN
 ```
 
-The tool verifies that the authenticated username matches the requested owner. It also compares the number of public and private repositories returned by the API with the account totals. If these counts differ, the available results are displayed, but the scan is marked as incomplete.
+The tool verifies that the authenticated username matches the requested owner. It compares the repository counts returned by the API with the account totals when GitHub supplies those totals. Fine-grained tokens may omit the private repository total; in that case the tool validates the public total and requires every repository returned by `GET /user/repos` to scan successfully. If an available count differs, the results are displayed, but the scan is marked as incomplete.
 
 ## Usage
 

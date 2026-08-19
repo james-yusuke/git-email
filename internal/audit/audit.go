@@ -77,10 +77,19 @@ func (r *Runner) Run(ctx context.Context, config Config) model.Report {
 			return report
 		}
 		publicCount, privateCount := repositoryCounts(repositories)
-		if publicCount != user.PublicRepos || privateCount != user.OwnedPrivateRepos {
+		// Fine-grained PAT responses may omit owned_private_repos or report zero
+		// even though /user/repos returns private repositories. In that case the
+		// private total is not an authoritative completeness signal. A positive
+		// reported total remains useful for detecting a restricted token.
+		privateCountComparable := user.OwnedPrivateReposReported && user.OwnedPrivateRepos > 0
+		if publicCount != user.PublicRepos || (privateCountComparable && privateCount != user.OwnedPrivateRepos) {
+			reportedPrivate := "unavailable"
+			if privateCountComparable {
+				reportedPrivate = fmt.Sprintf("%d", user.OwnedPrivateRepos)
+			}
 			addGlobalError(&report, "repository_completeness", fmt.Errorf(
-				"token can list %d public and %d private owned repositories; account reports %d public and %d private (grant the token access to all repositories)",
-				publicCount, privateCount, user.PublicRepos, user.OwnedPrivateRepos,
+				"token can list %d public and %d private owned repositories; account reports %d public and %s private (grant the token access to all repositories)",
+				publicCount, privateCount, user.PublicRepos, reportedPrivate,
 			))
 		}
 	}

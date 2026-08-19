@@ -83,7 +83,9 @@ func TestRunnerReportsIncompleteRepositoryPermissionsAndContinues(t *testing.T) 
 	repositories := []model.Repository{{FullName: "owner/public", HTMLURL: "public", Private: false}}
 	runner := Runner{
 		Source: fakeSource{
-			user:         model.User{Login: "owner", PublicRepos: 1, OwnedPrivateRepos: 1},
+			user: model.User{
+				Login: "owner", PublicRepos: 1, OwnedPrivateRepos: 1, OwnedPrivateReposReported: true,
+			},
 			repositories: repositories,
 		},
 		Scanner: fakeScanner{}, Jobs: 2,
@@ -97,6 +99,46 @@ func TestRunnerReportsIncompleteRepositoryPermissionsAndContinues(t *testing.T) 
 	}
 	if len(report.Errors) != 1 || report.Errors[0].Stage != "repository_completeness" {
 		t.Fatalf("unexpected errors: %+v", report.Errors)
+	}
+}
+
+func TestRunnerAcceptsUnavailableFineGrainedPrivateRepositoryTotal(t *testing.T) {
+	matcher, _ := scan.NewMatcher([]string{"found@example.com"})
+	repositories := []model.Repository{
+		{FullName: "owner/public"},
+		{FullName: "owner/private", Private: true},
+	}
+	runner := Runner{
+		Source: fakeSource{
+			user:         model.User{Login: "owner", PublicRepos: 1},
+			repositories: repositories,
+		},
+		Scanner: fakeScanner{},
+	}
+	report := runner.Run(context.Background(), Config{Owner: "owner", Matcher: matcher})
+	if !report.Complete || report.RepositoriesScanned != 2 || len(report.Errors) != 0 {
+		t.Fatalf("unexpected report: %+v", report)
+	}
+}
+
+func TestRunnerAcceptsZeroFineGrainedPrivateRepositoryTotal(t *testing.T) {
+	matcher, _ := scan.NewMatcher([]string{"found@example.com"})
+	repositories := []model.Repository{
+		{FullName: "owner/public"},
+		{FullName: "owner/private", Private: true},
+	}
+	runner := Runner{
+		Source: fakeSource{
+			user: model.User{
+				Login: "owner", PublicRepos: 1, OwnedPrivateReposReported: true,
+			},
+			repositories: repositories,
+		},
+		Scanner: fakeScanner{},
+	}
+	report := runner.Run(context.Background(), Config{Owner: "owner", Matcher: matcher})
+	if !report.Complete || report.RepositoriesScanned != 2 || len(report.Errors) != 0 {
+		t.Fatalf("unexpected report: %+v", report)
 	}
 }
 

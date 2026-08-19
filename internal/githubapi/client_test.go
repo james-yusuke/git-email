@@ -51,8 +51,24 @@ func TestAuthenticatedUserSendsRequiredHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.ID != 238946603 || user.Login != "james-yusuke" || user.PublicRepos != 25 || user.OwnedPrivateRepos != 3 {
+	if user.ID != 238946603 || user.Login != "james-yusuke" || user.PublicRepos != 25 || user.OwnedPrivateRepos != 3 || !user.OwnedPrivateReposReported {
 		t.Fatalf("unexpected user: %+v", user)
+	}
+}
+
+func TestAuthenticatedUserAllowsMissingPrivateRepositoryCount(t *testing.T) {
+	client := testClient(func(request *http.Request) (*http.Response, error) {
+		return jsonResponse(http.StatusOK, map[string]any{
+			"id": 238946603, "login": "james-yusuke", "public_repos": 22,
+		}), nil
+	})
+
+	user, err := client.AuthenticatedUser(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.OwnedPrivateReposReported || user.OwnedPrivateRepos != 0 {
+		t.Fatalf("unexpected private repository count: %+v", user)
 	}
 }
 

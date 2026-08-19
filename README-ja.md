@@ -44,7 +44,7 @@ read -s GITHUB_TOKEN
 export GITHUB_TOKEN
 ```
 
-ツールは認証ユーザー名と指定 owner が一致すること、および API で列挙できた public/private repo 数がアカウントの件数と一致することを確認します。不一致の場合は結果を表示したうえで「検査不完全」として終了します。
+ツールは認証ユーザー名と指定 owner が一致すること、および GitHub がアカウント件数を返す場合は API で列挙できた repo 数と一致することを確認します。fine-grained token では private repo 総数が返らない場合があるため、その場合は public 件数を照合し、`GET /user/repos` で返された全 repo の検査成功を必須とします。取得可能な件数が不一致の場合は結果を表示したうえで「検査不完全」として終了します。
 
 ## 使い方
 
