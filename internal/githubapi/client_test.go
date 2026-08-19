@@ -43,7 +43,7 @@ func TestAuthenticatedUserSendsRequiredHeaders(t *testing.T) {
 			t.Fatalf("API version = %q", got)
 		}
 		return jsonResponse(http.StatusOK, map[string]any{
-			"login": "james-yusuke", "public_repos": 25, "owned_private_repos": 3,
+			"id": 238946603, "login": "james-yusuke", "public_repos": 25, "owned_private_repos": 3,
 		}), nil
 	})
 
@@ -51,7 +51,7 @@ func TestAuthenticatedUserSendsRequiredHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.Login != "james-yusuke" || user.PublicRepos != 25 || user.OwnedPrivateRepos != 3 {
+	if user.ID != 238946603 || user.Login != "james-yusuke" || user.PublicRepos != 25 || user.OwnedPrivateRepos != 3 {
 		t.Fatalf("unexpected user: %+v", user)
 	}
 }

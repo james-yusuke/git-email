@@ -1,6 +1,11 @@
 package cli
 
-import "testing"
+import (
+	"bytes"
+	"context"
+	"strings"
+	"testing"
+)
 
 func TestParseOwner(t *testing.T) {
 	tests := []struct {
@@ -28,6 +33,27 @@ func TestParseOwnerRejectsInvalidValues(t *testing.T) {
 	} {
 		if _, err := ParseOwner(input); err == nil {
 			t.Fatalf("expected %q to be rejected", input)
+		}
+	}
+}
+
+func TestRewriteCommitsRequiresExplicitEmailAndConfirmation(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	tests := []struct {
+		arguments []string
+		message   string
+	}{
+		{arguments: []string{"scan", "--rewrite-commits", "owner"}, message: "requires at least one explicit --email"},
+		{arguments: []string{"scan", "--rewrite-commits", "--email", "target@example.com", "owner"}, message: "requires --yes"},
+		{arguments: []string{"scan", "--rewrite-commits", "--yes", "--email", "target@example.com", "--public-only", "owner"}, message: "cannot be used with --public-only"},
+	}
+	for _, test := range tests {
+		var stdout, stderr bytes.Buffer
+		if code := Run(context.Background(), test.arguments, &stdout, &stderr); code != 2 {
+			t.Fatalf("Run(%v) exit code = %d", test.arguments, code)
+		}
+		if !strings.Contains(stderr.String(), test.message) {
+			t.Fatalf("Run(%v) stderr = %q, want %q", test.arguments, stderr.String(), test.message)
 		}
 	}
 }

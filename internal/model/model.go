@@ -31,6 +31,7 @@ func (r Repository) Status() string {
 }
 
 type User struct {
+	ID                int64
 	Login             string
 	PublicRepos       int
 	OwnedPrivateRepos int
@@ -59,6 +60,13 @@ type ReportError struct {
 	Message    string `json:"message"`
 }
 
+type RewriteResult struct {
+	Repository       string   `json:"repository"`
+	RepositoryURL    string   `json:"repository_url"`
+	ReplacementEmail string   `json:"replacement_email"`
+	UpdatedRefs      []string `json:"updated_refs"`
+}
+
 type Summary struct {
 	RepositoriesWithFindings int `json:"repositories_with_findings"`
 	EmailFindings            int `json:"email_findings"`
@@ -68,13 +76,14 @@ type Summary struct {
 }
 
 type Report struct {
-	Owner                  string        `json:"owner"`
-	Complete               bool          `json:"complete"`
-	RepositoriesDiscovered int           `json:"repositories_discovered"`
-	RepositoriesScanned    int           `json:"repositories_scanned"`
-	Findings               []Finding     `json:"findings"`
-	Errors                 []ReportError `json:"errors,omitempty"`
-	Summary                Summary       `json:"summary"`
+	Owner                  string          `json:"owner"`
+	Complete               bool            `json:"complete"`
+	RepositoriesDiscovered int             `json:"repositories_discovered"`
+	RepositoriesScanned    int             `json:"repositories_scanned"`
+	Findings               []Finding       `json:"findings"`
+	Rewrites               []RewriteResult `json:"rewrites,omitempty"`
+	Errors                 []ReportError   `json:"errors,omitempty"`
+	Summary                Summary         `json:"summary"`
 }
 
 func (r *Report) Finalize() {
@@ -106,6 +115,12 @@ func (r *Report) Finalize() {
 		}
 		return r.Errors[i].Message < r.Errors[j].Message
 	})
+	sort.Slice(r.Rewrites, func(i, j int) bool {
+		return r.Rewrites[i].Repository < r.Rewrites[j].Repository
+	})
+	for i := range r.Rewrites {
+		sort.Strings(r.Rewrites[i].UpdatedRefs)
+	}
 
 	var summary Summary
 	repositories := make(map[string]struct{})

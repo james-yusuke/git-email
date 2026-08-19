@@ -118,16 +118,21 @@ func (s *GitScanner) cloneCommand(ctx context.Context, gitBinary, cloneURL, dest
 	}
 
 	command := exec.CommandContext(ctx, gitBinary, "-c", "credential.helper=", "clone", "--mirror", "--quiet", "--", cloneURL, destination)
-	command.Env = sanitizedEnvironment()
-	if s.Token != "" {
-		command.Env = append(command.Env,
-			"GIT_ASKPASS="+s.AskPassPath,
-			"GIT_TERMINAL_PROMPT=0",
-			"GIT_EMAIL_ASKPASS_MODE=1",
-			"GIT_EMAIL_ASKPASS_TOKEN="+s.Token,
-		)
-	}
+	command.Env = s.authenticatedEnvironment()
 	return command, nil
+}
+
+func (s *GitScanner) authenticatedEnvironment() []string {
+	environment := sanitizedEnvironment()
+	if s.Token == "" {
+		return environment
+	}
+	return append(environment,
+		"GIT_ASKPASS="+s.AskPassPath,
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_EMAIL_ASKPASS_MODE=1",
+		"GIT_EMAIL_ASKPASS_TOKEN="+s.Token,
+	)
 }
 
 func sanitizedEnvironment() []string {
@@ -155,7 +160,7 @@ func scanObjects(ctx context.Context, gitBinary, mirrorPath string, matcher *Mat
 	childContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	revCommand := exec.CommandContext(childContext, gitBinary, "-C", mirrorPath, "rev-list", "--objects", "--all")
+	revCommand := exec.CommandContext(childContext, gitBinary, "-C", mirrorPath, "rev-list", "--objects", "--branches", "--tags")
 	revCommand.Env = sanitizedEnvironment()
 	revOutput, err := revCommand.StdoutPipe()
 	if err != nil {

@@ -58,6 +58,20 @@ func WriteText(writer io.Writer, report model.Report) error {
 		}
 	}
 
+	if len(report.Rewrites) > 0 {
+		if _, err := fmt.Fprintln(writer, "\nRewrites:"); err != nil {
+			return err
+		}
+		for _, rewrite := range report.Rewrites {
+			if _, err := fmt.Fprintf(writer,
+				"  REWRITTEN %s\n    replacement_email: %s\n    updated_refs: %s\n",
+				rewrite.RepositoryURL, rewrite.ReplacementEmail, strings.Join(rewrite.UpdatedRefs, ", "),
+			); err != nil {
+				return err
+			}
+		}
+	}
+
 	if len(report.Errors) > 0 {
 		if _, err := fmt.Fprintln(writer, "\nErrors:"); err != nil {
 			return err

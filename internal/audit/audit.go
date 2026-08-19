@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/james-yusuke/git-email/internal/model"
@@ -19,16 +20,22 @@ type RepositoryScanner interface {
 	Scan(context.Context, model.Repository, *scan.Matcher) ([]model.Finding, error)
 }
 
+type RepositoryRewriter interface {
+	Rewrite(context.Context, model.Repository, *scan.Matcher, string) (model.RewriteResult, error)
+}
+
 type Runner struct {
-	Source  RepositorySource
-	Scanner RepositoryScanner
-	Jobs    int
+	Source   RepositorySource
+	Scanner  RepositoryScanner
+	Rewriter RepositoryRewriter
+	Jobs     int
 }
 
 type Config struct {
-	Owner      string
-	PublicOnly bool
-	Matcher    *scan.Matcher
+	Owner          string
+	PublicOnly     bool
+	Matcher        *scan.Matcher
+	RewriteCommits bool
 }
 
 func (r *Runner) Run(ctx context.Context, config Config) model.Report {
@@ -41,6 +48,7 @@ func (r *Runner) Run(ctx context.Context, config Config) model.Report {
 	}
 
 	var repositories []model.Repository
+	var authenticatedUser model.User
 	if config.PublicOnly {
 		var err error
 		repositories, err = r.Source.PublicRepositories(ctx, config.Owner)
@@ -61,6 +69,7 @@ func (r *Runner) Run(ctx context.Context, config Config) model.Report {
 			report.Finalize()
 			return report
 		}
+		authenticatedUser = user
 		repositories, err = r.Source.OwnedRepositories(ctx)
 		if err != nil {
 			addGlobalError(&report, "repository_discovery", err)
@@ -123,8 +132,61 @@ func (r *Runner) Run(ctx context.Context, config Config) model.Report {
 		report.RepositoriesScanned++
 		report.Findings = append(report.Findings, result.findings...)
 	}
+
+	if config.RewriteCommits {
+		if !report.Complete {
+			report.Errors = append(report.Errors, model.ReportError{Stage: "commit_rewrite", Message: "skipped because the repository scan was incomplete"})
+		} else if r.Rewriter == nil {
+			addGlobalError(&report, "configuration", fmt.Errorf("commit rewriter is not configured"))
+		} else if authenticatedUser.ID <= 0 {
+			addGlobalError(&report, "authentication", fmt.Errorf("GitHub user ID is required to generate a noreply replacement email"))
+		} else {
+			replacementEmail := fmt.Sprintf("%d+%s@users.noreply.github.com", authenticatedUser.ID, authenticatedUser.Login)
+			if _, targeted := config.Matcher.Match(replacementEmail); targeted {
+				addGlobalError(&report, "commit_rewrite", fmt.Errorf("target email %s is already the replacement noreply address", replacementEmail))
+				report.Finalize()
+				return report
+			}
+			repositoriesByName := make(map[string]model.Repository, len(repositories))
+			for _, repository := range repositories {
+				repositoriesByName[repository.FullName] = repository
+			}
+			affected := make(map[string]struct{})
+			for _, finding := range report.Findings {
+				if containsCommitSource(finding.Sources) {
+					affected[finding.Repository] = struct{}{}
+				}
+			}
+			affectedNames := make([]string, 0, len(affected))
+			for name := range affected {
+				affectedNames = append(affectedNames, name)
+			}
+			sort.Strings(affectedNames)
+			for _, name := range affectedNames {
+				repository := repositoriesByName[name]
+				rewriteResult, rewriteErr := r.Rewriter.Rewrite(ctx, repository, config.Matcher, replacementEmail)
+				if rewriteErr != nil {
+					report.Complete = false
+					report.Errors = append(report.Errors, model.ReportError{Repository: name, Stage: "commit_rewrite", Message: rewriteErr.Error()})
+					continue
+				}
+				if len(rewriteResult.UpdatedRefs) > 0 {
+					report.Rewrites = append(report.Rewrites, rewriteResult)
+				}
+			}
+		}
+	}
 	report.Finalize()
 	return report
+}
+
+func containsCommitSource(sources []string) bool {
+	for _, source := range sources {
+		if source == "commit_author" || source == "commit_committer" {
+			return true
+		}
+	}
+	return false
 }
 
 func repositoryCounts(repositories []model.Repository) (public, private int) {

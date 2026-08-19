@@ -43,6 +43,7 @@ func NewWithBaseURL(token, baseURL string, httpClient *http.Client) *Client {
 }
 
 type apiUser struct {
+	ID                int64  `json:"id"`
 	Login             string `json:"login"`
 	PublicRepos       int    `json:"public_repos"`
 	OwnedPrivateRepos int    `json:"owned_private_repos"`
@@ -67,6 +68,7 @@ func (c *Client) AuthenticatedUser(ctx context.Context) (model.User, error) {
 		return model.User{}, err
 	}
 	return model.User{
+		ID:                user.ID,
 		Login:             user.Login,
 		PublicRepos:       user.PublicRepos,
 		OwnedPrivateRepos: user.OwnedPrivateRepos,

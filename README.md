@@ -1,52 +1,56 @@
 # git-email
 
-`git-email` は、GitHub ユーザーが所有するリポジトリの Git 履歴を調べ、メールアドレスが含まれているリポジトリを表示する読み取り専用の Go CLI です。
+English | [日本語](README-ja.md)
 
-- public/private を含む本人所有リポジトリを列挙
-- 全 branch/tag から到達可能な commit author/committer を検査
-- 現在および過去の全 Git blob を検査
-- 指定メールの完全一致検索、またはメールの自動検出
-- 人間向け text と機械処理向け JSON 出力
-- GitHub 上のリポジトリ、履歴、ファイルを変更・削除しない
+`git-email` is a Go CLI that scans the Git history of repositories owned by a GitHub user and reports repositories containing email addresses. Scans are read-only by default. An explicitly confirmed remediation option can replace matching commit author/committer addresses and force-push the rewritten history.
 
-検査のためにリポジトリを一時 mirror として取得しますが、取得物は実行終了時にローカルから後片付けされます。
+- Lists repositories owned by the authenticated user, including public and private repositories
+- Scans commit author and committer metadata reachable from every branch and tag
+- Scans all current and historical Git blobs
+- Supports exact matching for specified addresses and automatic email detection
+- Produces human-readable text or machine-readable JSON
+- Can optionally replace matching commit metadata with the authenticated user's GitHub noreply address
 
-## 必要環境
+Repositories are temporarily cloned as mirrors for scanning. These local temporary copies are cleaned up when the command finishes.
 
-- Go 1.25 以上
+## Requirements
+
+- Go 1.25 or later
 - Git
-- private リポジトリを含める場合は GitHub Personal Access Token
+- A GitHub Personal Access Token when scanning private repositories or rewriting history
 
-## ビルド
+## Build
 
 ```bash
 go build -o git-email ./cmd/git-email
 ```
 
-## Token の準備
+## Configure a token
 
-public/private を漏れなく検査するには、GitHub の fine-grained personal access token を次の設定で作成します。
+To scan every public and private repository without omissions, create a fine-grained GitHub personal access token with the following settings:
 
-- Resource owner: 検査する本人
+- Resource owner: the account being scanned
 - Repository access: All repositories
 - Repository permissions:
-  - Metadata: Read（自動付与）
+  - Metadata: Read (granted automatically)
   - Contents: Read-only
 
-Token はコマンド引数や clone URL に入れず、`GITHUB_TOKEN` 環境変数で渡してください。
+Commit rewriting additionally requires `Contents: Read and write`. Repository rules and branch protection must allow the authenticated user to force-push the affected refs.
+
+Pass the token through the `GITHUB_TOKEN` environment variable. Do not include it in command arguments or clone URLs.
 
 ```bash
 read -s GITHUB_TOKEN
 export GITHUB_TOKEN
 ```
 
-ツールは認証ユーザー名と指定 owner が一致すること、および API で列挙できた public/private repo 数がアカウントの件数と一致することを確認します。不一致の場合は結果を表示したうえで「検査不完全」として終了します。
+The tool verifies that the authenticated username matches the requested owner. It also compares the number of public and private repositories returned by the API with the account totals. If these counts differ, the available results are displayed, but the scan is marked as incomplete.
 
-## 使い方
+## Usage
 
-### 指定メールを検索
+### Search for a specific email address
 
-`--email` は複数回指定できます。比較時は大文字小文字を区別しません。
+`--email` can be specified more than once. Matching is case-insensitive.
 
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
@@ -54,7 +58,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   james-yusuke
 ```
 
-GitHub profile URL も指定できます。
+A GitHub profile URL can also be used:
 
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
@@ -62,23 +66,23 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   https://github.com/james-yusuke
 ```
 
-### メールを自動検出
+### Detect email addresses automatically
 
-`--email` を省略すると、メール形式の文字列をすべて検出します。`users.noreply.github.com` などの GitHub noreply アドレスは自動的に除外されます。
+When `--email` is omitted, the tool reports every email-like string it finds. GitHub noreply addresses, including addresses under `users.noreply.github.com`, are excluded automatically.
 
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan james-yusuke
 ```
 
-自動検出は、README に意図的に掲載した問い合わせ先なども候補として表示します。特定の個人メールだけを調べたい場合は `--email` を指定してください。
+Automatic detection also reports addresses intentionally published in files such as a README. Use `--email` when you only want to check a specific personal address.
 
-### public repo のみ検査
+### Scan public repositories only
 
 ```bash
 ./git-email scan --public-only james-yusuke
 ```
 
-### JSON 出力
+### Produce JSON output
 
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
@@ -87,15 +91,37 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   james-yusuke
 ```
 
-### 並列数の変更
+### Change concurrency
 
-既定では最大4リポジトリを並列に検査します。
+By default, up to four repositories are scanned concurrently.
 
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan --jobs 2 james-yusuke
 ```
 
-## 表示の意味
+### Rewrite matching commit emails
+
+> [!CAUTION]
+> This operation rewrites Git history and force-pushes changed branches and tags. Commit SHAs change, commit/tag signatures in the rewritten history become invalid, and collaborators must rebase or clone again. Forks, cached commit pages, and external copies may continue to contain the original address.
+
+Rewriting is disabled unless all of the following are supplied:
+
+- One or more explicit `--email` values; automatic detection cannot be used for rewriting
+- `--rewrite-commits`
+- `--yes` as destructive-operation confirmation
+- A token belonging to the requested owner with write access to every affected repository
+
+```bash
+GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
+  --email user@example.com \
+  --rewrite-commits \
+  --yes \
+  james-yusuke
+```
+
+The tool preserves file trees, commit messages, names, and timestamps. Matching author/committer addresses are replaced with `ID+USERNAME@users.noreply.github.com`. Only branches and tags whose hashes changed are pushed, using an atomic `--force-with-lease` update to avoid overwriting concurrent remote changes. Addresses found in file contents are reported but are not modified.
+
+## Understanding the output
 
 ```text
 EXPOSED https://github.com/example/public-repo
@@ -105,40 +131,44 @@ EXPOSED https://github.com/example/public-repo
   matches: 3
 ```
 
-- `EXPOSED`: public repo 内で検出され、外部から参照可能
-- `PRIVATE_FINDING`: private repo 内で検出されたが、外部公開済みとは断定しない
-- `commit_author`: commit author のメール
-- `commit_committer`: commit committer のメール
-- `blob`: Git が管理するファイル内容
+- `EXPOSED`: the address was found in a public repository and is externally accessible
+- `PRIVATE_FINDING`: the address was found in a private repository; this does not mean it has been publicly exposed
+- `commit_author`: email from commit author metadata
+- `commit_committer`: email from commit committer metadata
+- `blob`: email found in Git-managed file content
+- `REWRITTEN`: matching commit metadata was replaced and the listed refs were force-pushed successfully
 
-同じメールはリポジトリ単位で集約し、検出数と最大5件の代表的な SHA/path を表示します。ファイルの本文は表示しません。
+Matches are grouped by repository and email address. Each finding includes the total match count and up to five representative SHA/path records. File contents are never printed.
 
-## 終了コード
+## Exit codes
 
-| Code | 意味 |
+| Code | Meaning |
 | ---: | --- |
-| `0` | メールを検出せず、検査が完了した |
-| `1` | 1件以上のメールを検出した |
-| `2` | 認証、権限、API、clone などの問題で検査が不完全だった |
+| `0` | The scan completed without finding an email address |
+| `1` | One or more email addresses were found |
+| `2` | The scan was incomplete because of an authentication, permission, API, clone, or similar error |
 
-検出結果とエラーが両方ある場合は、結果を表示して終了コード `2` を返します。
+If findings and errors are both present, the tool displays the findings and exits with code `2`.
 
-## 検査対象外
+A successful rewrite still exits with code `1` because the report records addresses found during the original scan. A rewrite or push failure exits with code `2`.
 
-- branch/tag のどちらからも到達できない Git オブジェクト
-- Git LFS の実ファイル（Git 内の LFS pointer は検査対象）
-- 圧縮ファイルや暗号化ファイルの展開後の内容
-- Issue、Pull Request コメント、Wiki、Release、Actions log
-- submodule が参照する外部リポジトリの内容
+## Out of scope
 
-## セキュリティ
+- Git objects unreachable from every branch and tag
+- Git LFS payloads (the Git-tracked LFS pointer is scanned)
+- Decompressed contents of archives or encrypted files
+- Issues, pull request comments, wikis, releases, and Actions logs
+- Content from external repositories referenced by submodules
 
-- GitHub API は GET のみ使用します。
-- `git clone --mirror`、`git rev-list`、`git cat-file` のみ使用し、push や履歴変更コマンドは実行しません。
-- Token は Git の引数、clone URL、レポート、エラーメッセージに含めません。
-- private repo を含む一時 mirror は、成功・失敗・キャンセル時のいずれも実行終了時に後片付けします。
+## Security
 
-## 開発時の確認
+- The GitHub API is only accessed with GET requests.
+- Normal scans only invoke read-only Git operations and never push or rewrite history.
+- Force-push is only enabled by the combined `--rewrite-commits --yes --email ...` options.
+- Tokens are never placed in Git arguments, clone URLs, reports, or error messages.
+- Temporary mirrors, including mirrors of private repositories, are cleaned up after successful, failed, or cancelled scans.
+
+## Development checks
 
 ```bash
 go test -race ./...

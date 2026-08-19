@@ -44,6 +44,8 @@ func Run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 	format := flags.String("format", "text", "output format: text or json")
 	jobs := flags.Int("jobs", 4, "number of repositories to scan concurrently")
 	publicOnly := flags.Bool("public-only", false, "scan public repositories without requiring private access")
+	rewriteCommits := flags.Bool("rewrite-commits", false, "replace matching commit emails with the authenticated user's GitHub noreply address and force-push")
+	confirmRewrite := flags.Bool("yes", false, "confirm destructive history rewriting and force-pushing")
 	if err := flags.Parse(arguments[1:]); err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		writeUsage(stderr)
@@ -72,6 +74,23 @@ func Run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 2
 	}
+	if *rewriteCommits {
+		if *publicOnly {
+			fmt.Fprintln(stderr, "error: --rewrite-commits cannot be used with --public-only")
+			return 2
+		}
+		if len(emails) == 0 {
+			fmt.Fprintln(stderr, "error: --rewrite-commits requires at least one explicit --email")
+			return 2
+		}
+		if !*confirmRewrite {
+			fmt.Fprintln(stderr, "error: --rewrite-commits requires --yes because it rewrites Git history and force-pushes changed refs")
+			return 2
+		}
+	} else if *confirmRewrite {
+		fmt.Fprintln(stderr, "error: --yes is only valid with --rewrite-commits")
+		return 2
+	}
 
 	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
 	if !*publicOnly && token == "" {
@@ -86,8 +105,8 @@ func Run(ctx context.Context, arguments []string, stdout, stderr io.Writer) int 
 
 	client := githubapi.New(token)
 	gitScanner := &scan.GitScanner{Token: token, AskPassPath: executable}
-	runner := &audit.Runner{Source: client, Scanner: gitScanner, Jobs: *jobs}
-	report := runner.Run(ctx, audit.Config{Owner: owner, PublicOnly: *publicOnly, Matcher: matcher})
+	runner := &audit.Runner{Source: client, Scanner: gitScanner, Rewriter: gitScanner, Jobs: *jobs}
+	report := runner.Run(ctx, audit.Config{Owner: owner, PublicOnly: *publicOnly, Matcher: matcher, RewriteCommits: *rewriteCommits})
 	if *format == "json" {
 		err = output.WriteJSON(stdout, report)
 	} else {
@@ -130,5 +149,5 @@ func ParseOwner(value string) (string, error) {
 }
 
 func writeUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "usage: git-email scan [--email ADDRESS] [--format text|json] [--jobs N] [--public-only] <owner|profile-url>")
+	fmt.Fprintln(writer, "usage: git-email scan [--email ADDRESS] [--format text|json] [--jobs N] [--public-only] [--rewrite-commits --yes] <owner|profile-url>")
 }

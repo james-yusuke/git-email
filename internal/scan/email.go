@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -61,6 +62,15 @@ func (m *Matcher) Match(email string) (string, bool) {
 		return "", false
 	}
 	return normalized, true
+}
+
+func (m *Matcher) Targets() []string {
+	targets := make([]string, 0, len(m.specified))
+	for email := range m.specified {
+		targets = append(targets, email)
+	}
+	sort.Strings(targets)
+	return targets
 }
 
 func isGitHubNoreply(email string) bool {

@@ -56,3 +56,23 @@ func TestWriteJSONAndExitCodes(t *testing.T) {
 		t.Fatalf("incomplete exit code = %d", code)
 	}
 }
+
+func TestWriteTextShowsRewriteResults(t *testing.T) {
+	report := model.Report{
+		Owner: "owner", Complete: true,
+		Rewrites: []model.RewriteResult{{
+			Repository: "owner/repo", RepositoryURL: "https://github.com/owner/repo",
+			ReplacementEmail: "123+owner@users.noreply.github.com", UpdatedRefs: []string{"refs/heads/main"},
+		}},
+	}
+	report.Finalize()
+	var buffer bytes.Buffer
+	if err := WriteText(&buffer, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"REWRITTEN https://github.com/owner/repo", "123+owner@users.noreply.github.com", "refs/heads/main"} {
+		if !strings.Contains(buffer.String(), expected) {
+			t.Fatalf("output does not contain %q:\n%s", expected, buffer.String())
+		}
+	}
+}
