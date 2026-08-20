@@ -55,7 +55,7 @@ export GITHUB_TOKEN
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
-  james-yusuke
+  username
 ```
 
 GitHub profile URL も指定できます。
@@ -63,7 +63,7 @@ GitHub profile URL も指定できます。
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
-  https://github.com/james-yusuke
+  https://github.com/username
 ```
 
 ### メールを自動検出
@@ -71,7 +71,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
 `--email` を省略すると、メール形式の文字列をすべて検出します。`users.noreply.github.com` などの GitHub noreply アドレスは自動的に除外されます。
 
 ```bash
-GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan james-yusuke
+GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan username
 ```
 
 自動検出は、README に意図的に掲載した問い合わせ先なども候補として表示します。特定の個人メールだけを調べたい場合は `--email` を指定してください。
@@ -79,7 +79,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan james-yusuke
 ### public repo のみ検査
 
 ```bash
-./git-email scan --public-only james-yusuke
+./git-email scan --public-only username
 ```
 
 ### JSON 出力
@@ -88,7 +88,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan james-yusuke
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --format json \
   --email user@example.com \
-  james-yusuke
+  username
 ```
 
 ### 並列数の変更
@@ -96,7 +96,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
 既定では最大4リポジトリを並列に検査します。
 
 ```bash
-GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan --jobs 2 james-yusuke
+GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan --jobs 2 username
 ```
 
 ### 対象commitメールを書き換える
@@ -116,7 +116,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
   --rewrite-commits \
   --yes \
-  james-yusuke
+  username
 ```
 
 ファイルツリー、commit message、名前、日時は保持されます。一致するauthor/committerメールだけを`ID+USERNAME@users.noreply.github.com`へ置換します。hashが変わったbranch/tagだけを、同時更新を上書きしないatomicな`--force-with-lease`でpushします。ファイル本文から見つかったメールは表示のみで、変更しません。

@@ -55,7 +55,7 @@ The tool verifies that the authenticated username matches the requested owner. I
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
-  james-yusuke
+  username
 ```
 
 A GitHub profile URL can also be used:
@@ -63,7 +63,7 @@ A GitHub profile URL can also be used:
 ```bash
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
-  https://github.com/james-yusuke
+  https://github.com/username
 ```
 
 ### Detect email addresses automatically
@@ -71,7 +71,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
 When `--email` is omitted, the tool reports every email-like string it finds. GitHub noreply addresses, including addresses under `users.noreply.github.com`, are excluded automatically.
 
 ```bash
-GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan james-yusuke
+GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan username
 ```
 
 Automatic detection also reports addresses intentionally published in files such as a README. Use `--email` when you only want to check a specific personal address.
@@ -79,7 +79,7 @@ Automatic detection also reports addresses intentionally published in files such
 ### Scan public repositories only
 
 ```bash
-./git-email scan --public-only james-yusuke
+./git-email scan --public-only username
 ```
 
 ### Produce JSON output
@@ -88,7 +88,7 @@ Automatic detection also reports addresses intentionally published in files such
 GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --format json \
   --email user@example.com \
-  james-yusuke
+  username
 ```
 
 ### Change concurrency
@@ -96,7 +96,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
 By default, up to four repositories are scanned concurrently.
 
 ```bash
-GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan --jobs 2 james-yusuke
+GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan --jobs 2 username
 ```
 
 ### Rewrite matching commit emails
@@ -116,7 +116,7 @@ GITHUB_TOKEN="$GITHUB_TOKEN" ./git-email scan \
   --email user@example.com \
   --rewrite-commits \
   --yes \
-  james-yusuke
+  username
 ```
 
 The tool preserves file trees, commit messages, names, and timestamps. Matching author/committer addresses are replaced with `ID+USERNAME@users.noreply.github.com`. Only branches and tags whose hashes changed are pushed, using an atomic `--force-with-lease` update to avoid overwriting concurrent remote changes. Addresses found in file contents are reported but are not modified.
